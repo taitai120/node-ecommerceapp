@@ -2,6 +2,7 @@ const User = require("../models/userModel");
 const asyncHandler = require("express-async-handler");
 const { generateToken } = require("../config/jwtToken");
 const { generateRefreshToken } = require("../config/refreshToken");
+const jwt = require("jsonwebtoken");
 
 const register = asyncHandler(async (req, res) => {
     const { email } = req.body;
@@ -122,8 +123,20 @@ const logout = asyncHandler(async (req, res) => {
     const refreshToken = cookie.refreshToken;
     const user = await User.findOne({ refreshToken });
     if (!user) {
-        res.clearCookie("refreshoken");
+        res.clearCookie("refreshToken", {
+            httpOnly: true,
+            secure: true,
+        });
+        return res.sendStatus(204);
     }
+    await User.findOneAndUpdate(refreshToken, {
+        refreshToken: "",
+    });
+    res.clearCookie("refreshToken", {
+        httpOnly: true,
+        secure: true,
+    });
+    return res.sendStatus(204);
 });
 
 module.exports = {
