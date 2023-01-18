@@ -34,4 +34,8 @@ router.put(
     authController.unBlockUser
 );
 
+router.post("/forgot-password-token", authController.forgotPasswordToken);
+router.post("/reset-password/:token", authController.resetPassword);
+router.put("/update-password", authMiddleware, authController.updatePassword);
+
 module.exports = router;

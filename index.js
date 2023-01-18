@@ -3,6 +3,7 @@ const dotenv = require("dotenv");
 const dbConnect = require("./config/dbConnect");
 const userRoutes = require("./routes/userRoutes");
 const productRoutes = require("./routes/productRoutes");
+const blogRoutes = require("./routes/blogRoutes");
 const bodyParser = require("body-parser");
 const { notFound, errorHandler } = require("./middlewares/errorHandler");
 const cookieParser = require("cookie-parser");
@@ -18,6 +19,7 @@ app.use(morgan("dev"));
 
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/products", productRoutes);
+app.use("/api/v1/blogs", blogRoutes);
 app.use(notFound);
 app.use(errorHandler);
 
