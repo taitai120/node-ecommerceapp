@@ -1,6 +1,10 @@
 const Product = require("../models/productModel");
+const User = require("../models/userModel");
 const asyncHandler = require("express-async-handler");
 const slugify = require("slugify");
+const validateMongoDbId = require("../utils/validateMongodbId");
+const cloudinaryUploadImg = require("../utils/cloudinary");
+const fs = require("fs");
 
 const createProduct = asyncHandler(async (req, res) => {
     try {
@@ -114,10 +118,156 @@ const updateProduct = asyncHandler(async (req, res) => {
     }
 });
 
+const addToWishList = asyncHandler(async (req, res) => {
+    const { _id } = req?.user;
+    const { prodId } = req.body;
+    const user = await User.findById(_id);
+
+    const alreadyAdded = user?.wishlist.find(
+        (pro) => pro._id.toString() == prodId.toString()
+    );
+
+    let updatedWishlist;
+    if (alreadyAdded) {
+        updatedWishlist = await User.findByIdAndUpdate(
+            _id,
+            {
+                $pull: { wishlist: prodId },
+            },
+            {
+                new: true,
+            }
+        );
+    } else {
+        updatedWishlist = await User.findByIdAndUpdate(
+            _id,
+            {
+                $push: { wishlist: prodId },
+            },
+            {
+                new: true,
+            }
+        );
+    }
+
+    res.status(200).json({
+        status: "success",
+        data: updatedWishlist,
+    });
+});
+
+const rating = asyncHandler(async (req, res) => {
+    const { _id } = req.user;
+    const { star, comment, prodId } = req.body;
+
+    try {
+        const product = await Product.findById(prodId);
+        let alreadyRated = product.ratings.find(
+            (userId) => userId.postedBy.toString() === _id.toString()
+        );
+
+        let updatedRating;
+        if (alreadyRated) {
+            updateRating = await Product.updateOne(
+                {
+                    ratings: { $elemMatch: alreadyRated },
+                },
+                {
+                    $set: {
+                        "ratings.$.star": star,
+                        "ratings.$.comment": comment,
+                    },
+                },
+                {
+                    new: true,
+                }
+            );
+        } else {
+            updatedRating = await Product.findByIdAndUpdate(
+                prodId,
+                {
+                    $push: {
+                        ratings: {
+                            star,
+                            comment,
+                            postedBy: _id,
+                        },
+                    },
+                },
+                {
+                    new: true,
+                }
+            );
+        }
+
+        const getAllRatings = await Product.findById(prodId);
+        let totalRating = getAllRatings.ratings.length;
+        let ratingSum = getAllRatings.ratings
+            .map((item) => item.star)
+            .reduce((prev, cur) => {
+                return prev + cur;
+            }, 0);
+        let actualRating = Math.round(ratingSum / totalRating);
+        let finalProduct = await Product.findByIdAndUpdate(
+            prodId,
+            {
+                totalRatings: actualRating,
+            },
+            {
+                new: true,
+            }
+        );
+
+        res.status(200).json({
+            status: "success",
+            data: finalProduct,
+        });
+    } catch (error) {
+        throw new Error(error);
+    }
+});
+
+const uploadImages = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    validateMongoDbId(id);
+
+    try {
+        const uploader = (path) => cloudinaryUploadImg(path, "images");
+        const urls = [];
+        const files = req.files;
+
+        for (let file of files) {
+            const { path } = file;
+            const newpath = await uploader(path);
+            urls.push(newpath);
+            fs.unlinkSync(path);
+        }
+        const findProduct = await Product.findByIdAndUpdate(
+            id,
+            {
+                images: urls.map((file) => file),
+            },
+            {
+                new: true,
+            }
+        );
+
+        res.status(200).json({
+            status: "success",
+            data: findProduct,
+        });
+    } catch (error) {
+        throw new Error(error);
+    }
+});
+
 module.exports = {
     createProduct,
     getProductById,
     getAllProducts,
     deleteProduct,
     updateProduct,
+    addToWishList,
+    rating,
+    uploadImages,
 };

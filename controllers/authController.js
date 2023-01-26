@@ -56,6 +56,39 @@ const login = asyncHandler(async (req, res) => {
     }
 });
 
+const loginAdmin = asyncHandler(async (req, res) => {
+    const { email, password } = req.body;
+    const findAdmin = await User.findOne({ email });
+    if (findAdmin.role !== "admin") throw new Error("Not Authorized");
+    if (findAdmin && (await findAdmin.isPasswordMatched(password))) {
+        const refreshToken = await generateRefreshToken(findAdmin?._id);
+        const updateUser = await User.findByIdAndUpdate(
+            findAdmin._id,
+            {
+                refreshToken,
+            },
+            { new: true }
+        );
+        res.cookie("refreshToken", refreshToken, {
+            httpOnly: true,
+            maxAge: 72 * 60 * 60 * 1000,
+        });
+        res.status(200).json({
+            status: "success",
+            data: {
+                _id: findAdmin?._id,
+                firstName: findAdmin?.firstName,
+                lastName: findAdmin?.lastName,
+                email: findAdmin?.email,
+                mobile: findAdmin?.mobile,
+                token: generateToken(findAdmin?._id),
+            },
+        });
+    } else {
+        throw new Error("Invalid Credientials");
+    }
+});
+
 const blockUser = asyncHandler(async (req, res) => {
     const { id } = req.params;
 
@@ -234,6 +267,7 @@ const updatePassword = asyncHandler(async (req, res) => {
 module.exports = {
     register,
     login,
+    loginAdmin,
     blockUser,
     unBlockUser,
     handleRefreshToken,
